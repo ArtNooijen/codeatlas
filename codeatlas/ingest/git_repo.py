@@ -95,9 +95,29 @@ class RepoManager:
         fork_api = f"https://api.github.com/repos/{self.source_owner}/{self.repo_name}/forks"
         headers = {"Authorization": f"Bearer {self.token}", "Accept": "application/vnd.github+json"}
         console.print(f"[cyan]Forking {self.source_owner}/{self.repo_name} into {self.fork_owner}...")
-        resp = self.session.post(fork_api, json={"organization": self.fork_owner}, headers=headers)
+        fork_payload = self._fork_payload()
+        resp = self.session.post(fork_api, json=fork_payload, headers=headers)
+
         if resp.status_code not in (202, 201):
             raise RuntimeError(f"Fork request failed: {resp.status_code} {resp.text}")
+
+        fork_url = f"https://github.com/{self.fork_owner}/{self.repo_name}"
+        self._wait_for_fork(headers, fork_url)
+        return fork_url
+
+    def _fork_payload(self) -> dict | None:
+        """Return payload for fork creation; include org only when target is an org."""
+        headers: dict[str, str] = {"Accept": "application/vnd.github+json"}
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+        user_resp = self.session.get(f"https://api.github.com/users/{self.fork_owner}", headers=headers)
+        if user_resp.status_code != 200:
+            console.print(f"[yellow]Could not verify owner type for {self.fork_owner}; treating as user.")
+            return None
+        owner_type = user_resp.json().get("type")
+        if owner_type == "Organization":
+            return {"organization": self.fork_owner}
+        return None
 
         fork_url = f"https://github.com/{self.fork_owner}/{self.repo_name}"
         self._wait_for_fork(headers, fork_url)
