@@ -16,3 +16,7 @@ models:
     instance: "remote"
   - name: "llama3.1:8b"
     instance: "local"
+
+git:
+  author_name: "CodeAtlas"
+  author_email: "codeatlas@example.com"

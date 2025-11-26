@@ -26,6 +26,17 @@ Adjust `codeatlas/config/models.yaml`:
 2. Register models with the `instance` they should call.
 3. Mark one `default: true` to control the CLI fallback.
 
+## Git author configuration
+The same config file now accepts an optional `git` block:
+
+```yaml
+git:
+  author_name: "Docs Bot"
+  author_email: "docs@example.com"
+```
+
+These settings control the `git commit` signature when CodeAtlas writes docs. If omitted, the defaults (`CodeAtlas` / `codeatlas@example.com`) are used. You can override either field at runtime with the `GIT_AUTHOR_NAME` and `GIT_AUTHOR_EMAIL` environment variables.
+
 ## Customizing MkDocs
 The generated `mkdocs.yml` uses the Material theme. You can safely add extra configuration (plugins, palettes, etc.); CodeAtlas preserves the file and only overwrites `site_name`, `theme`, and the nav list.
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import yaml
+
 from .ingest.git_repo import RepoManager
 from .llm.generate_docs import DocumentationGenerator
 from .docs.site import MkDocsSite
@@ -41,6 +43,11 @@ def cli(argv: list[str] | None = None) -> None:
     parser.add_argument("--push", action="store_true", help="Push commits back to the fork when finished")
     args = parser.parse_args(argv)
 
+    config_path = Path(args.config)
+    config_data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config_data = config_data or {}
+    git_config = config_data.get("git", {}) or {}
+
     repo_mgr = RepoManager(
         repo_url=args.repo,
         fork_owner=args.fork_owner,
@@ -51,13 +58,17 @@ def cli(argv: list[str] | None = None) -> None:
     repo_info = repo_mgr.prepare_repo(branch=args.branch)
 
     model_list = [m.strip() for m in args.models.split(",") if m.strip()] if args.models else None
-    doc_gen = DocumentationGenerator(config_path=args.config, models=model_list, max_chars=args.max_chars)
+    doc_gen = DocumentationGenerator(config_path=str(config_path), models=model_list, max_chars=args.max_chars)
     generated_docs = doc_gen.generate(repo_info)
 
     site = MkDocsSite(repo_info)
     site.ensure_site_structure(generated_docs)
 
-    publisher = Publisher(repo_info)
+    publisher = Publisher(
+        repo_info,
+        author_name=git_config.get("author_name"),
+        author_email=git_config.get("author_email"),
+    )
     publisher.commit_and_optionally_push(push=args.push)
 
 

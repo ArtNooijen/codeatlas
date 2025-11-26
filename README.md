@@ -37,6 +37,17 @@ See `docs/USAGE.md` for advanced arguments, token handling, and troubleshooting 
 - Reference those instances from the `models` section and mark one with `default: true` (defaults to `qwen3:8b`).
 - Override at runtime with `--models qwen3:8b,llama3.1:8b`.
 
+## Git author metadata
+Use the same `models.yaml` file to control the commit signature CodeAtlas uses:
+
+```yaml
+git:
+  author_name: "Docs Bot"
+  author_email: "docs@example.com"
+```
+
+These values override the defaults (`CodeAtlas` / `codeatlas@example.com`). You can still override either field via the `GIT_AUTHOR_NAME` and `GIT_AUTHOR_EMAIL` environment variables if needed for one-off runs.
+
 ## Outputs inside the fork
 - `docs/index.md` contains a generated table of contents.
 - `docs/code/<path>.md` mirrors the repository layout and includes summaries per model plus detected imports.

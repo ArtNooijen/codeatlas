@@ -14,9 +14,16 @@ console = Console()
 class Publisher:
     """Commits generated artifacts back into the forked repo."""
 
-    def __init__(self, repo_info: RepoInfo) -> None:
+    def __init__(
+        self,
+        repo_info: RepoInfo,
+        author_name: str | None = None,
+        author_email: str | None = None,
+    ) -> None:
         self.repo_info = repo_info
         self.repo = pygit2.Repository(str(repo_info.path))
+        self.author_name = author_name
+        self.author_email = author_email
 
     def commit_and_optionally_push(self, push: bool = False) -> None:
         if not self._stage_changes():
@@ -53,8 +60,8 @@ class Publisher:
         return str(commit_id)
 
     def _signature(self) -> pygit2.Signature:
-        name = os.getenv("GIT_AUTHOR_NAME", "CodeAtlas")
-        email = os.getenv("GIT_AUTHOR_EMAIL", "codeatlas@example.com")
+        name = self.author_name or os.getenv("GIT_AUTHOR_NAME", "CodeAtlas")
+        email = self.author_email or os.getenv("GIT_AUTHOR_EMAIL", "codeatlas@example.com")
         return pygit2.Signature(name, email)
 
     def _push(self) -> None:
