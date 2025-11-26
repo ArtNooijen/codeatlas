@@ -1,0 +1,18 @@
+ollama_instances:
+  local:
+    host: "localhost"
+    port: 11434
+    timeout: 30
+  remote:
+    host: "drutus"
+    port: 11434
+    timeout: 30
+
+models:
+  - name: "qwen3:8b"
+    instance: "remote"
+    default: true
+  - name: "mistral:7b"
+    instance: "remote"
+  - name: "llama3.1:8b"
+    instance: "local"
