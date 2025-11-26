@@ -30,6 +30,45 @@ class MkDocsSite:
         config["docs_dir"] = "docs"
         config["theme"] = {"name": "material"}
 
+        # Ensure Mermaid support is enabled
+        if "markdown_extensions" not in config:
+            config["markdown_extensions"] = []
+        extensions = config["markdown_extensions"]
+        # Check if pymdownx.superfences is already configured
+        superfences_idx = None
+        for i, ext in enumerate(extensions):
+            if isinstance(ext, dict) and "pymdownx.superfences" in ext:
+                superfences_idx = i
+                break
+        if superfences_idx is None:
+            # Add pymdownx.superfences with Mermaid support
+            extensions.append({
+                "pymdownx.superfences": {
+                    "custom_fences": [
+                        {
+                            "name": "mermaid",
+                            "class": "mermaid",
+                            "format": "!!python/name:pymdownx.superfences.fence_code_format"
+                        }
+                    ]
+                }
+            })
+        else:
+            # Update existing superfences config
+            superfences = extensions[superfences_idx]["pymdownx.superfences"]
+            if "custom_fences" not in superfences:
+                superfences["custom_fences"] = []
+            # Check if mermaid is already in custom_fences
+            mermaid_exists = any(
+                fence.get("name") == "mermaid" for fence in superfences["custom_fences"]
+            )
+            if not mermaid_exists:
+                superfences["custom_fences"].append({
+                    "name": "mermaid",
+                    "class": "mermaid",
+                    "format": "!!python/name:pymdownx.superfences.fence_code_format"
+                })
+
         nav = [{"Home": "index.md"}]
         code_nav = self._build_code_nav(code_docs)
         if code_nav:

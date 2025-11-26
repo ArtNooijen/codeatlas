@@ -161,7 +161,6 @@ class DocumentationGenerator:
         1. Purpose summary
         2. Key functions/classes and their collaboration
         3. External dependencies or APIs used
-        4. Extension ideas, pitfalls, or TODOs
 
         Imports detected:
         {imports_hint}
