@@ -14,6 +14,8 @@ uv run codeatlas --repo <url> --fork-owner <owner> [options]
 | `--token` | Explicit GitHub token. |
 | `--token-env` | Env var to read the token from when `--token` is omitted (default `GITHUB_TOKEN`). |
 | `--models` | Comma-separated Ollama models to run (defaults to config's `default`). |
+| `--diagram-model` | Specific model for Mermaid diagrams (defaults to config). |
+| `--diagram-prompt` | Custom prompt template for diagram generation. |
 | `--max-chars` | Character cap per file sent to the model (default 6000). |
 | `--push` | Push the commit back to the fork after generation. |
 
@@ -25,6 +27,7 @@ Adjust `codeatlas/config/models.yaml`:
 1. Add each reachable Ollama host under `ollama_instances`.
 2. Register models with the `instance` they should call.
 3. Mark one `default: true` to control the CLI fallback.
+4. Optionally set `diagram_default_model` and `diagram_prompt` for Mermaid diagrams.
 
 ## Git author configuration
 The same config file now accepts an optional `git` block:

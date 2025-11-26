@@ -25,7 +25,7 @@ uv run codeatlas \
 The CLI will:
 1. Fork `user/project` into `your-github-handle` (unless you already own it).
 2. Clone the fork into `--workdir`.
-3. Generate Markdown for every supported file using `qwen3:8b` (or any models you request).
+3. Generate Markdown for every supported file using `qwen3:8b` (or any models you request) plus optional Mermaid diagrams.
 4. Create/refresh `docs/` and `mkdocs.yml` inside the fork using MkDocs Material.
 5. Commit the changes; add `--push` to push them back to GitHub immediately.
 
@@ -36,6 +36,12 @@ See `docs/USAGE.md` for advanced arguments, token handling, and troubleshooting 
 - List every Ollama endpoint under `ollama_instances`.
 - Reference those instances from the `models` section and mark one with `default: true` (defaults to `qwen3:8b`).
 - Override at runtime with `--models qwen3:8b,llama3.1:8b`.
+- Set `diagram_default_model` and `diagram_prompt` to control the dedicated model that builds Mermaid call-graph diagrams (`--diagram-model`/`--diagram-prompt` override them per run).
+
+## Mermaid diagrams
+- Add a secondary Ollama model dedicated to structural visualizations with `--diagram-model llama3.1:8b`.
+- Customize the prompt template with `--diagram-prompt "Your template {path} {language} {content}"`.
+- Each Markdown file will gain a `## Function Diagram` section containing the Mermaid output.
 
 ## Git author metadata
 Use the same `models.yaml` file to control the commit signature CodeAtlas uses:

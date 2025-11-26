@@ -17,6 +17,19 @@ models:
   - name: "llama3.1:8b"
     instance: "local"
 
+diagram_default_model: "qwen3:8b"
+diagram_prompt: |
+  You are an expert code visualiser. Read the provided source file {path}
+  written in {language}. Identify the key functions or component methods and
+  how they call each other. Return ONLY a Mermaid flowchart such as:
+
+  ```mermaid
+  graph TD
+      A --> B
+  ```
+
+  Use short node labels (function names) and directed edges for calls.
+
 git:
   author_name: "CodeAtlas"
   author_email: "codeatlas@example.com"

@@ -35,6 +35,16 @@ def cli(argv: list[str] | None = None) -> None:
         help="Comma-separated list of Ollama model names to run (defaults to config's primary model)",
     )
     parser.add_argument(
+        "--diagram-model",
+        default=None,
+        help="Model name for Mermaid diagrams (defaults to config value)",
+    )
+    parser.add_argument(
+        "--diagram-prompt",
+        default=None,
+        help="Override prompt template used for diagram generation",
+    )
+    parser.add_argument(
         "--max-chars",
         type=int,
         default=6000,
@@ -58,7 +68,13 @@ def cli(argv: list[str] | None = None) -> None:
     repo_info = repo_mgr.prepare_repo(branch=args.branch)
 
     model_list = [m.strip() for m in args.models.split(",") if m.strip()] if args.models else None
-    doc_gen = DocumentationGenerator(config_path=str(config_path), models=model_list, max_chars=args.max_chars)
+    doc_gen = DocumentationGenerator(
+        config_path=str(config_path),
+        models=model_list,
+        max_chars=args.max_chars,
+        diagram_model=args.diagram_model,
+        diagram_prompt=args.diagram_prompt,
+    )
     generated_docs = doc_gen.generate(repo_info)
 
     site = MkDocsSite(repo_info)
