@@ -38,6 +38,7 @@ class RepoInfo:
     fork_url: str
     files: list[FileRecord] = field(default_factory=list)
     token: str | None = None
+    dependency_analyzer: object | None = None  # DependencyAnalyzer instance
 
 
 class RepoManager:
@@ -66,11 +67,24 @@ class RepoManager:
             raise ValueError("Repository URL must look like https://github.com/<owner>/<repo>")
         self.source_owner, self.repo_name = parts[:2]
 
-    def prepare_repo(self, branch: str = "main") -> RepoInfo:
+    def prepare_repo(
+        self,
+        branch: str = "main",
+        changed_files: list[str] | None = None,
+        filter_changed: bool = False,
+    ) -> RepoInfo:
         """Fork, clone, and collect metadata for the repository."""
         fork_url = self._ensure_fork()
         repo_path = self._clone_or_open(Path(self.workdir) / self.repo_name, fork_url, branch)
-        files = list(self._collect_files(repo_path))
+        all_files = list(self._collect_files(repo_path))
+        
+        # Filter files if changed_files provided and filter_changed is True
+        if filter_changed and changed_files:
+            changed_set = set(changed_files)
+            files = [f for f in all_files if f.rel_path in changed_set]
+        else:
+            files = all_files
+        
         return RepoInfo(
             source_url=self.repo_url,
             fork_owner=self.fork_owner,
@@ -143,6 +157,8 @@ class RepoManager:
                 shutil.rmtree(repo_path)
                 return self._clone_or_open(repo_path, fork_url, branch)
             self._fetch_origin(repo)
+            # Reset any uncommitted changes before checking out
+            self._reset_working_directory(repo)
             self._checkout_branch(repo, branch)
             return repo_path
 
@@ -172,6 +188,19 @@ class RepoManager:
             console.print(f"[yellow]Fetch failed: {exc}")
 
     @staticmethod
+    def _reset_working_directory(repo: pygit2.Repository) -> None:
+        """Reset working directory to clean state before checkout."""
+        try:
+            # Get current HEAD
+            head = repo.head
+            if head:
+                # Reset index and working directory to HEAD
+                repo.reset(head.target, pygit2.GIT_RESET_HARD)
+                console.print("[cyan]Reset working directory to clean state")
+        except Exception as exc:
+            console.print(f"[yellow]Could not reset working directory: {exc}")
+
+    @staticmethod
     def _checkout_branch(repo: pygit2.Repository, branch: str) -> None:
         ref_name = f"refs/heads/{branch}"
         try:
@@ -186,11 +215,26 @@ class RepoManager:
         repo.checkout(ref_name)
 
     def _collect_files(self, repo_path: Path) -> Iterable[FileRecord]:
+        # Directories to exclude (to avoid documenting documentation and build artifacts)
+        exclude_prefixes = [
+            ".git/",
+            "docs/",  # Exclude documentation directory
+            "site/",  # Exclude built MkDocs site
+            "node_modules/",
+            ".venv/",
+            "venv/",
+            "__pycache__/",
+            ".pytest_cache/",
+            "dist/",
+            "build/",
+        ]
+        
         for path in repo_path.rglob("*"):
             if path.is_dir():
                 continue
             rel_path = path.relative_to(repo_path).as_posix()
-            if rel_path.startswith(".git/"):
+            # Skip excluded directories
+            if any(rel_path.startswith(prefix) for prefix in exclude_prefixes):
                 continue
             language = self._language_for(rel_path)
             yield FileRecord(rel_path=rel_path, language=language, size_bytes=path.stat().st_size)
@@ -207,3 +251,71 @@ class RepoManager:
             ".go": "go",
         }
         return mapping.get(ext, "text")
+
+    def has_existing_docs(self, repo_path: Path) -> bool:
+        """Check if repository already has documentation."""
+        docs_dir = repo_path / "docs"
+        if not docs_dir.exists():
+            return False
+        # Check if docs directory has content (not just empty)
+        code_docs = docs_dir / "code"
+        if code_docs.exists() and any(code_docs.rglob("*.md")):
+            return True
+        # Check for any markdown files in docs
+        return any(docs_dir.rglob("*.md"))
+
+    def get_changed_files(
+        self,
+        repo_path: Path,
+        base_ref: str | None = None,
+        head_ref: str | None = None,
+    ) -> list[str]:
+        """Get list of changed files between two commits/branches."""
+        try:
+            repo = pygit2.Repository(str(repo_path))
+        except (KeyError, pygit2.GitError):
+            return []
+
+        changed: list[str] = []
+
+        if base_ref and head_ref:
+            # Compare two specific refs
+            try:
+                base_commit = repo.revparse_single(base_ref)
+                head_commit = repo.revparse_single(head_ref)
+            except (KeyError, ValueError):
+                return []
+        elif base_ref:
+            # Compare base_ref with HEAD
+            try:
+                base_commit = repo.revparse_single(base_ref)
+                head_commit = repo.revparse_single("HEAD")
+            except (KeyError, ValueError):
+                return []
+        else:
+            # Compare HEAD with previous commit
+            try:
+                head_commit = repo.revparse_single("HEAD")
+                if head_commit.parents:
+                    base_commit = head_commit.parents[0]
+                else:
+                    return []  # No parent, can't compare
+            except (KeyError, ValueError):
+                return []
+
+        try:
+            diff = repo.diff(base_commit, head_commit)
+            for patch in diff:
+                if patch.delta.status in {
+                    pygit2.GIT_DELTA_ADDED,
+                    pygit2.GIT_DELTA_MODIFIED,
+                    pygit2.GIT_DELTA_DELETED,
+                }:
+                    file_path = patch.delta.new_file.path or patch.delta.old_file.path
+                    if file_path:
+                        changed.append(file_path)
+        except Exception as exc:
+            console.print(f"[yellow]Error getting changed files: {exc}")
+            return []
+
+        return changed

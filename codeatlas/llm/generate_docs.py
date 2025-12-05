@@ -28,6 +28,22 @@ Source code:
 {content}
 """
 
+DEFAULT_DOCUMENTATION_PROMPT = """
+You are CodeAtlas, an expert codebase documentarian. Summarize the file {path}
+from repository {repo_name}.
+
+Produce:
+1. Purpose summary
+2. Key functions/classes and their collaboration
+3. External dependencies or APIs used
+
+Imports detected:
+{imports}{dep_context}
+
+File content:
+{content}
+"""
+
 
 @dataclass
 class ModelConfig:
@@ -60,6 +76,9 @@ class DocumentationGenerator:
         self.diagram_prompt_template = (
             diagram_prompt or self.config.get("diagram_prompt") or DEFAULT_DIAGRAM_PROMPT
         )
+        self.documentation_prompt_template = (
+            self.config.get("documentation_prompt") or DEFAULT_DOCUMENTATION_PROMPT
+        )
         self.diagram_client = None
         if self.diagram_model_name:
             try:
@@ -73,7 +92,13 @@ class DocumentationGenerator:
         code_root = docs_root / "code"
         code_root.mkdir(parents=True, exist_ok=True)
         generated: list[Path] = []
-        files = [record for record in repo_info.files if self._should_process(record)]
+        
+        # Filter files that should be processed and don't have existing docs
+        files = []
+        for record in repo_info.files:
+            if self._should_process(record) and not self._has_existing_doc(docs_root, record):
+                files.append(record)
+        
         if not files:
             console.print("[yellow]No eligible files found for LLM documentation.")
             return generated
@@ -90,7 +115,9 @@ class DocumentationGenerator:
                     progress.advance(task)
                     continue
                 imports = self._extract_imports(record, snippet)
-                prompt = self._build_prompt(repo_info, record, snippet, imports)
+                # Get dependency context if analyzer is available
+                dep_context = self._get_dependency_context(repo_info, record)
+                prompt = self._build_prompt(repo_info, record, snippet, imports, dep_context)
                 sections = []
                 for model_name, client in self.clients.items():
                     try:
@@ -151,24 +178,72 @@ class DocumentationGenerator:
         record: FileRecord,
         content: str,
         imports: list[str],
+        dep_context: dict[str, list[str]] | None = None,
     ) -> str:
         imports_hint = "\n".join(imports) or "None"
-        prompt = f"""
-        You are CodeAtlas, an expert codebase documentarian. Summarize the file {record.rel_path}
-        from repository {repo_info.repo_name}.
-
-        Produce:
-        1. Purpose summary
-        2. Key functions/classes and their collaboration
-        3. External dependencies or APIs used
-
-        Imports detected:
-        {imports_hint}
-
-        File content:
-        {content}
-        """
+        
+        # Build dependency context section
+        dep_section = ""
+        if dep_context:
+            deps = dep_context.get("dependencies", [])
+            dependents = dep_context.get("dependents", [])
+            
+            if deps or dependents:
+                dep_section = "\n\nDependency Context:\n"
+                if deps:
+                    dep_section += f"- This file depends on: {', '.join(deps[:10])}"
+                    if len(deps) > 10:
+                        dep_section += f" (and {len(deps) - 10} more)"
+                    dep_section += "\n"
+                if dependents:
+                    dep_section += f"- Files that depend on this file: {', '.join(dependents[:10])}"
+                    if len(dependents) > 10:
+                        dep_section += f" (and {len(dependents) - 10} more)"
+                    dep_section += "\n"
+        
+        # Use the configured prompt template
+        prompt = self.documentation_prompt_template.format(
+            path=record.rel_path,
+            repo_name=repo_info.repo_name,
+            language=record.language,
+            imports=imports_hint,
+            dep_context=dep_section,
+            content=content,
+        )
         return textwrap.dedent(prompt)
+    
+    def _has_existing_doc(self, docs_root: Path, record: FileRecord) -> bool:
+        """Check if documentation already exists for a file."""
+        doc_path = self._doc_path(docs_root, record)
+        return doc_path.exists()
+    
+    def _repo_has_documentation(self, repo_path: Path) -> bool:
+        """Check if repository already has documentation."""
+        docs_dir = repo_path / "docs"
+        if not docs_dir.exists():
+            return False
+        # Check if docs directory has content (not just empty)
+        code_docs = docs_dir / "code"
+        if code_docs.exists() and any(code_docs.rglob("*.md")):
+            return True
+        # Check for any markdown files in docs
+        return any(docs_dir.rglob("*.md"))
+    
+    def _get_dependency_context(
+        self, repo_info: RepoInfo, record: FileRecord
+    ) -> dict[str, list[str]] | None:
+        """Get dependency context for a file if analyzer is available."""
+        if not repo_info.dependency_analyzer:
+            return None
+        
+        analyzer = repo_info.dependency_analyzer
+        deps = analyzer.get_file_dependencies(record.rel_path)
+        dependents = analyzer.get_file_dependents(record.rel_path)
+        
+        return {
+            "dependencies": deps[:20],  # Limit to avoid prompt bloat
+            "dependents": dependents[:20],
+        }
 
     def _extract_imports(self, record: FileRecord, content: str) -> list[str]:
         if record.language != "python":

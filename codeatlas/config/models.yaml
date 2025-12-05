@@ -30,6 +30,21 @@ diagram_prompt: |
 
   Use short node labels (function names) and directed edges for calls.
 
+documentation_prompt: |
+  You are CodeAtlas, an expert codebase documentarian. Summarize the file {path}
+  from repository {repo_name}.
+
+  Produce:
+  1. Purpose summary
+  2. Key functions/classes and their collaboration
+  3. External dependencies or APIs used
+
+  Imports detected:
+  {imports}{dep_context}
+
+  File content:
+  {content}
+
 git:
   author_name: "CodeAtlas"
   author_email: "codeatlas@example.com"
