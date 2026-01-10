@@ -14,7 +14,10 @@ console = Console()
 
 
 class DependencyAnalyzer:
-    """Extract import/require statements to build file dependency graph."""
+    """Extract import/require statements to build file dependency graph.
+    and give more 
+    """
+
 
     def __init__(self, repo_info: RepoInfo) -> None:
         self.repo_info = repo_info

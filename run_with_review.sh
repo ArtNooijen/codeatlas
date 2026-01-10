@@ -15,9 +15,12 @@ fi
 # Run codeatlas with review PR creation
 cd /Users/artnooijen/Documents/CGI/codeatlas && \
 uv run python -m codeatlas.main \
-  --repo https://github.com/JManders07/BeerWithFriends-Front-end \
+  --repo https://github.com/Luke943/Euler-Maths/blob/main/src/euler_maths/misc.py \
   --fork-owner ArtNooijen \
   --token "$GITHUB_TOKEN" \
   --models qwen3:8b \
   --branch main \
   --create-review-pr
+
+
+https://github.com/JManders07/BeerWithFriends-Front-end/blob/main/src/views/EditView.vue

@@ -1,0 +1,163 @@
+@startuml CodeAtlas Architecture
+
+!theme plain
+skinparam classAttributeIconSize 0
+
+package "codeatlas.main" {
+  class CLI {
+    +cli(argv: list[str] | None)
+    +cli_mode(args, config_path)
+    +github_actions_mode(args, config_path)
+    +parse_github_event() dict | None
+  }
+}
+
+package "codeatlas.ingest" {
+  class RepoManager {
+    -repo_url: str
+    -fork_owner: str
+    -workdir: Path
+    -token: str | None
+    -session: httpx.Client
+    +prepare_repo(branch: str) RepoInfo
+    -_ensure_fork() str
+    -_clone_or_open(repo_path, fork_url, branch) Path
+    -_collect_files(repo_path) Iterable[FileRecord]
+    -_language_for(rel_path: str) str
+    +has_existing_docs(repo_path: Path) bool
+    +get_changed_files(repo_path, base_ref, head_ref) list[str]
+  }
+
+  dataclass FileRecord {
+    +rel_path: str
+    +language: str
+    +size_bytes: int
+  }
+
+  dataclass RepoInfo {
+    +source_url: str
+    +fork_owner: str
+    +repo_name: str
+    +path: Path
+    +branch: str
+    +fork_url: str
+    +files: list[FileRecord]
+    +token: str | None
+    +dependency_analyzer: DependencyAnalyzer
+  }
+}
+
+package "codeatlas.deps" {
+  class DependencyAnalyzer {
+    -repo_info: RepoInfo
+    -repo_path: Path
+    -dependencies: DefaultDict[str, list[str]]
+    -dependents: DefaultDict[str, list[str]]
+    +analyze()
+    +get_file_dependencies(file_path: str) list[str]
+    +get_file_dependents(file_path: str) list[str]
+    -_should_analyze(record: FileRecord) bool
+    -_extract_dependencies(record, content) list[str]
+    -_resolve_python_module(file_dir, module) str | None
+    -_resolve_js_module(file_dir, module) str | None
+    -_resolve_rust_module(file_dir, module) str | None
+    -_resolve_go_package(file_dir, package) str | None
+  }
+}
+
+package "codeatlas.llm" {
+  class DocumentationGenerator {
+    -config_path: Path
+    -config: dict
+    -clients: dict[str, Client]
+    -diagram_client: Client | None
+    -max_chars: int
+    +generate(repo_info: RepoInfo) list[Path]
+    -_load_config() dict
+    -_client_for(model_name: str) Client
+    -_should_process(record: FileRecord) bool
+    -_build_prompt(repo_info, record, content, imports, dep_context) str
+    -_get_dependency_context(repo_info, record) dict | None
+    -_generate_diagram(record, content) str | None
+    -_render_markdown(record, sections, imports, diagram) str
+  }
+
+  dataclass ModelConfig {
+    +name: str
+    +instance: str
+    +default: bool
+  }
+}
+
+package "codeatlas.docs" {
+  class MkDocsSite {
+    -repo_info: RepoInfo
+    -repo_path: Path
+    -docs_root: Path
+    -mkdocs_file: Path
+    +ensure_site_structure(generated_docs: Iterable[Path] | None)
+    -_discover_docs() list[Path]
+    -_build_code_nav(doc_paths: list[Path]) list[dict]
+    -_load_config() dict
+  }
+}
+
+package "codeatlas.publish" {
+  class Publisher {
+    -repo_info: RepoInfo
+    -repo: pygit2.Repository
+    -author_name: str | None
+    -author_email: str | None
+    +commit_and_optionally_push(push: bool, commit_message: str | None)
+    +build_mkdocs_site() bool
+    -_stage_changes() bool
+    -_commit(commit_message: str | None) str
+    -_push()
+    -_signature() pygit2.Signature
+  }
+}
+
+package "codeatlas.review" {
+  class ReviewManager {
+    -repo_info: RepoInfo
+    -repo: pygit2.Repository
+    -token: str | None
+    -session: httpx.Client
+    +create_review_branch(branch_suffix: str | None) str
+    +create_review_pr(branch_name, title, body, documented_files) str | None
+    +push_review_branch(branch_name: str) bool
+    -_origin_remote() pygit2.Remote | None
+  }
+}
+
+' Relationships
+CLI --> RepoManager : creates
+CLI --> DependencyAnalyzer : creates
+CLI --> DocumentationGenerator : creates
+CLI --> MkDocsSite : creates
+CLI --> Publisher : creates
+CLI --> ReviewManager : creates
+
+RepoManager --> RepoInfo : creates
+RepoManager --> FileRecord : creates
+
+DependencyAnalyzer --> RepoInfo : uses
+DependencyAnalyzer --> FileRecord : uses
+
+DocumentationGenerator --> RepoInfo : uses
+DocumentationGenerator --> FileRecord : uses
+DocumentationGenerator --> ModelConfig : uses
+DocumentationGenerator --> DependencyAnalyzer : uses
+
+MkDocsSite --> RepoInfo : uses
+
+Publisher --> RepoInfo : uses
+
+ReviewManager --> RepoInfo : uses
+
+RepoInfo --> FileRecord : contains
+RepoInfo --> DependencyAnalyzer : references
+
+@enduml
+
+

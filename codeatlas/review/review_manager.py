@@ -56,7 +56,7 @@ class ReviewManager:
     ) -> str | None:
         """Create a GitHub PR for documentation review."""
         # Create PR in the fork repository (where we're working)
-        # The fork_url tells us where the fork is
+        # The fork_url tells me where the fork is
         parsed = urlparse(self.repo_info.fork_url)
         if parsed.netloc == "github.com":
             parts = parsed.path.strip("/").split("/")
@@ -77,7 +77,10 @@ class ReviewManager:
             body_lines = [
                 "## Auto-Generated Documentation",
                 "",
-                "This PR contains automatically generated documentation.",
+                "This PR contains automatically generated documentation. Please review the changes below.",
+                "Click the files changed tab to see the proposed documentation updates.",
+                "If everything looks good, approve and merge this PR to finalize the documentation.",
+            
             ]
             if documented_files:
                 body_lines.extend([

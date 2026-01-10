@@ -12,6 +12,7 @@ dependencies = [
     "mkdocs>=1.6",
     "mkdocs-material>=9.5",
     "rich>=13.9",
+    "pysonar>=1.3.0.4086",
 ]
 
 [project.scripts]
