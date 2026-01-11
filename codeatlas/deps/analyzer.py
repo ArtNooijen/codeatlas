@@ -78,7 +78,9 @@ class DependencyAnalyzer:
     def _extract_python_deps(self, record: FileRecord, content: str) -> list[str]:
         """Extract Python import statements and resolve to file paths."""
         deps: list[str] = []
-        file_dir = Path(record.rel_path).parent
+        # Ensure file_dir is relative to repo root, not absolute
+        rel_path = Path(record.rel_path)
+        file_dir = rel_path.parent if rel_path.parent != rel_path else Path(".")
         
         for line in content.splitlines():
             line = line.strip()
@@ -195,16 +197,57 @@ class DependencyAnalyzer:
 
     def _resolve_python_module(self, file_dir: Path, module: str) -> str | None:
         """Resolve Python module name to file path relative to repo root."""
+        # Ensure file_dir is relative to repo root
+        if file_dir.is_absolute():
+            try:
+                file_dir = file_dir.relative_to(self.repo_path)
+            except ValueError:
+                # If not relative to repo_path, make it relative from repo root
+                file_dir = Path(".")
+        elif str(file_dir) == "/" or str(file_dir) == "":
+            file_dir = Path(".")
+        
         # Try relative to current file directory first
         module_parts = module.split(".")
+        if not module_parts or not any(module_parts):
+            return None
         
         # Try as relative path
         potential_path = file_dir / "/".join(module_parts)
+        
+        # Normalize the path and ensure it's relative
+        if potential_path.is_absolute():
+            try:
+                potential_path = potential_path.relative_to(self.repo_path)
+            except ValueError:
+                return None
+        
+        # Avoid empty paths or root paths - check before calling with_suffix
+        path_str = str(potential_path)
+        if not path_str or path_str in ("/", ".", ""):
+            return None
+        
+        # Ensure the path has a name component (not just directory separators)
+        if not potential_path.name or potential_path.name == "/":
+            return None
+        
         for ext in ["", ".py"]:
-            test_path = potential_path.with_suffix(ext) if ext else potential_path
-            full_path = self.repo_path / test_path
-            if full_path.exists() and full_path.is_file():
-                return str(test_path)
+            try:
+                if ext:
+                    test_path = potential_path.with_suffix(ext)
+                else:
+                    test_path = potential_path
+                
+                # Double-check the path is valid before using it
+                if not test_path.name or str(test_path) in ("/", ".", ""):
+                    continue
+                    
+                full_path = self.repo_path / test_path
+                if full_path.exists() and full_path.is_file():
+                    return str(test_path)
+            except (ValueError, AttributeError):
+                # Skip if with_suffix fails (e.g., empty name)
+                continue
         
         # Try with __init__.py
         init_path = potential_path / "__init__.py"
@@ -213,12 +256,31 @@ class DependencyAnalyzer:
             return str(init_path)
         
         # Try from repo root
+        if not module_parts or not any(module_parts):
+            return None
         root_path = Path("/".join(module_parts))
+        
+        # Validate path before using with_suffix
+        if not root_path.name or str(root_path) in ("/", ".", ""):
+            return None
+        
         for ext in ["", ".py"]:
-            test_path = root_path.with_suffix(ext) if ext else root_path
-            full_path = self.repo_path / test_path
-            if full_path.exists() and full_path.is_file():
-                return str(test_path)
+            try:
+                if ext:
+                    test_path = root_path.with_suffix(ext)
+                else:
+                    test_path = root_path
+                
+                # Double-check the path is valid
+                if not test_path.name or str(test_path) in ("/", ".", ""):
+                    continue
+                    
+                full_path = self.repo_path / test_path
+                if full_path.exists() and full_path.is_file():
+                    return str(test_path)
+            except (ValueError, AttributeError):
+                # Skip if with_suffix fails (e.g., empty name)
+                continue
         
         return None
 
