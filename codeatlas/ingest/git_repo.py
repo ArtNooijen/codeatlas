@@ -66,11 +66,28 @@ class RepoManager:
             raise ValueError("Repository URL must look like https://github.com/<owner>/<repo>")
         self.source_owner, self.repo_name = parts[:2]
 
-    def prepare_repo(self, branch: str = "main") -> RepoInfo:
-        """Fork, clone, and collect metadata for the repository."""
+    def prepare_repo(
+        self,
+        branch: str = "main",
+        changed_files: list[str] | None = None,
+        filter_changed: bool = False,
+    ) -> RepoInfo:
+        """Fork, clone, and collect metadata for the repository.
+        
+        Args:
+            branch: Branch to checkout
+            changed_files: Optional list of changed file paths to filter by
+            filter_changed: If True and changed_files is provided, only include those files
+        """
         fork_url = self._ensure_fork()
         repo_path = self._clone_or_open(Path(self.workdir) / self.repo_name, fork_url, branch)
         files = list(self._collect_files(repo_path))
+        
+        # Filter files if requested
+        if filter_changed and changed_files:
+            changed_set = set(changed_files)
+            files = [f for f in files if f.rel_path in changed_set]
+        
         return RepoInfo(
             source_url=self.repo_url,
             fork_owner=self.fork_owner,
@@ -239,3 +256,81 @@ class RepoManager:
             
         }
         return mapping.get(ext, "text")
+
+    def has_existing_docs(self, repo_path: Path) -> bool:
+        """Check if repository already has documentation."""
+        docs_dir = repo_path / "docs"
+        if not docs_dir.exists():
+            return False
+        # Check if docs directory has content (not just empty)
+        code_docs = docs_dir / "code"
+        if code_docs.exists() and any(code_docs.rglob("*.md")):
+            return True
+        # Check for any markdown files in docs
+        if any(docs_dir.rglob("*.md")):
+            return True
+        return False
+
+    def get_changed_files(self, repo_path: Path, base_ref: str | None = None, head_ref: str | None = None) -> list[str]:
+        """Get list of changed files from git.
+        
+        Args:
+            repo_path: Path to the repository
+            base_ref: Base reference (e.g., 'refs/heads/main') for comparison
+            head_ref: Head reference (commit SHA) for comparison
+            
+        Returns:
+            List of relative file paths that changed
+        """
+        try:
+            repo = pygit2.Repository(str(repo_path))
+        except (KeyError, pygit2.GitError):
+            return []
+
+        changed_files = []
+        
+        if base_ref and head_ref:
+            # Compare two specific refs
+            try:
+                # Parse base_ref - could be a ref name or commit SHA
+                if base_ref.startswith("refs/"):
+                    base_obj = repo.lookup_reference(base_ref).peel(pygit2.Commit)
+                else:
+                    base_obj = repo.revparse_single(base_ref).peel(pygit2.Commit)
+                
+                # Parse head_ref - should be a commit SHA
+                head_obj = repo.revparse_single(head_ref).peel(pygit2.Commit)
+                    
+                diff = repo.diff(base_obj, head_obj)
+            except (KeyError, ValueError, pygit2.GitError) as exc:
+                console.print(f"[yellow]Could not compare refs {base_ref} and {head_ref}: {exc}")
+                return []
+        else:
+            # Compare HEAD with previous commit
+            if repo.head_is_unborn:
+                return []
+            try:
+                head = repo.head
+                head_commit = head.peel(pygit2.Commit)
+                if not head_commit.parents:
+                    # First commit, all files are new
+                    tree = head_commit.tree
+                    for entry in tree:
+                        changed_files.append(entry.name)
+                    return changed_files
+                
+                parent_commit = head_commit.parents[0]
+                diff = repo.diff(parent_commit, head_commit)
+            except (KeyError, ValueError) as exc:
+                console.print(f"[yellow]Could not get diff: {exc}")
+                return []
+
+        # Extract changed file paths
+        for patch in diff:
+            if patch.delta.new_file.path:
+                # Use new_file path, fallback to old_file if new_file doesn't exist (deleted files)
+                file_path = patch.delta.new_file.path or patch.delta.old_file.path
+                if file_path:
+                    changed_files.append(file_path)
+
+        return list(set(changed_files))  # Remove duplicates

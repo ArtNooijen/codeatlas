@@ -188,6 +188,8 @@ def github_actions_mode(args: argparse.Namespace, config_path: Path) -> None:
     # Check for existing docs
     has_docs = repo_mgr.has_existing_docs(github_workspace)
     repo_path = github_workspace
+    changed_files = None
+    filter_changed = False
 
     if has_docs:
         # Get changed files
