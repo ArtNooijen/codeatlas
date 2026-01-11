@@ -42,8 +42,15 @@ class ReviewManager:
         branch_ref = f"refs/heads/{branch_name}"
         self.repo.create_reference(branch_ref, head_commit.id)
 
-        # Checkout the new branch
-        self.repo.checkout(branch_ref)
+        # Checkout the new branch with strategy to update HEAD
+        strategy = pygit2.GIT_CHECKOUT_FORCE
+        self.repo.checkout(branch_ref, strategy=strategy)
+        
+        # Verify we're on the correct branch
+        if self.repo.head.name != branch_ref:
+            # If HEAD didn't update, set it explicitly
+            self.repo.set_head(branch_ref)
+        
         console.print(f"[green]Created and checked out review branch: {branch_name}")
         return branch_name
 
