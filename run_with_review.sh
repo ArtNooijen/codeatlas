@@ -12,15 +12,19 @@ if [ -z "$GITHUB_TOKEN" ]; then
     exit 1
 fi
 
+# Get the script directory and change to project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR" || exit 1
+
 # Run codeatlas with review PR creation
-cd /Users/artnooijen/Documents/CGI/codeatlas && \
+# Example: ./run_with_review.sh https://github.com/user/repo your-github-handle
+REPO_URL="${1:-https://github.com/Luke943/Euler-Maths}"
+FORK_OWNER="${2:-ArtNooijen}"
+
 uv run python -m codeatlas.main \
-  --repo https://github.com/Luke943/Euler-Maths/blob/main/src/euler_maths/misc.py \
-  --fork-owner ArtNooijen \
+  --repo "$REPO_URL" \
+  --fork-owner "$FORK_OWNER" \
   --token "$GITHUB_TOKEN" \
   --models qwen3:8b \
   --branch main \
   --create-review-pr
-
-
-https://github.com/JManders07/BeerWithFriends-Front-end/blob/main/src/views/EditView.vue
