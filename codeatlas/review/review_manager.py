@@ -42,8 +42,15 @@ class ReviewManager:
         branch_ref = f"refs/heads/{branch_name}"
         self.repo.create_reference(branch_ref, head_commit.id)
 
-        # Checkout the new branch
-        self.repo.checkout(branch_ref)
+        # Checkout the new branch with strategy to update HEAD
+        strategy = pygit2.GIT_CHECKOUT_FORCE
+        self.repo.checkout(branch_ref, strategy=strategy)
+        
+        # Verify we're on the correct branch
+        if self.repo.head.name != branch_ref:
+            # If HEAD didn't update, set it explicitly
+            self.repo.set_head(branch_ref)
+        
         console.print(f"[green]Created and checked out review branch: {branch_name}")
         return branch_name
 
@@ -56,7 +63,7 @@ class ReviewManager:
     ) -> str | None:
         """Create a GitHub PR for documentation review."""
         # Create PR in the fork repository (where we're working)
-        # The fork_url tells us where the fork is
+        # The fork_url tells me where the fork is
         parsed = urlparse(self.repo_info.fork_url)
         if parsed.netloc == "github.com":
             parts = parsed.path.strip("/").split("/")
@@ -77,7 +84,10 @@ class ReviewManager:
             body_lines = [
                 "## Auto-Generated Documentation",
                 "",
-                "This PR contains automatically generated documentation.",
+                "This PR contains automatically generated documentation. Please review the changes below.",
+                "Click the files changed tab to see the proposed documentation updates.",
+                "If everything looks good, approve and merge this PR to finalize the documentation.",
+            
             ]
             if documented_files:
                 body_lines.extend([

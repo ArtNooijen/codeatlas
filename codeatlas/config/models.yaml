@@ -44,7 +44,8 @@ documentation_prompt: |
 
   File content:
   {content}
-
+# this is just a place holder for now /changes based on company that hosts this application
 git:
   author_name: "CodeAtlas"
-  author_email: "codeatlas@example.com"
+  author_email: "codeatlas@CGI.com" 
+

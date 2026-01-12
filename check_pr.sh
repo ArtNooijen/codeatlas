@@ -2,6 +2,7 @@
 
 # Check if a PR was created for the documentation
 # Usage: ./check_pr.sh
+# I ran into some issues where i the pr did not work it is here just for checking what whas wrong
 
 # Load environment variables from .env file if it exists
 if [ -f .env ]; then

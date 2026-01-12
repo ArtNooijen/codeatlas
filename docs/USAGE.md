@@ -88,6 +88,37 @@ The generated `mkdocs.yml` uses the Material theme. You can safely add extra con
 4. Use `--push` or manually push the new `docs` commit to publish the wiki.
 
 ### Review PR Workflow
+
+#### Using the convenience script
+The `run_with_review.sh` script simplifies running CodeAtlas with review PR creation:
+
+```bash
+# Make the script executable (first time only)
+chmod +x run_with_review.sh
+
+# Run with default repository and fork owner
+./run_with_review.sh
+
+# Or specify repository and fork owner as arguments
+./run_with_review.sh https://github.com/user/repo your-github-handle
+```
+
+The script:
+- Automatically loads environment variables from `.env` file (lines 2-7)
+- Validates that `GITHUB_TOKEN` is set
+- Runs CodeAtlas with `--create-review-pr` flag
+- Uses `qwen3:8b` model by default (can be modified in the script)
+
+**Setup:**
+1. Create a `.env` file in the project root with your GitHub token:
+   ```bash
+   # .env file
+   GITHUB_TOKEN=your_token_here
+   ```
+2. Make the script executable: `chmod +x run_with_review.sh`
+3. Run the script as shown above
+
+#### Manual Review PR Workflow
 1. `uv run codeatlas --repo ... --fork-owner ... --token ... --create-review-pr`
 2. Review the generated PR on GitHub.
 3. Make any necessary edits directly in the PR.

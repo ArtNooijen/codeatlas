@@ -52,7 +52,15 @@ class Publisher:
         tree_id = index.write_tree()
         signature = self._signature()
         parents = [] if self.repo.head_is_unborn else [self.repo.head.target]
-        ref = f"refs/heads/{self.repo_info.branch}"
+        
+        # Use the current HEAD branch instead of always using repo_info.branch
+        # This allows commits to go to review branches when checked out
+        if self.repo.head_is_unborn:
+            ref = f"refs/heads/{self.repo_info.branch}"
+        else:
+            # Get the current branch reference from HEAD
+            ref = self.repo.head.name
+        
         message = commit_message or "docs: refresh CodeAtlas output"
         commit_id = self.repo.create_commit(
             ref,
@@ -62,6 +70,7 @@ class Publisher:
             tree_id,
             parents,
         )
+        console.print(f"[cyan]Committed to branch: {ref}")
         return str(commit_id)
 
     def _signature(self) -> pygit2.Signature:
