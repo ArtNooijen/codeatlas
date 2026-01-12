@@ -6,7 +6,7 @@ if [ -f .env ]; then
     export $(sed -n '2,7p' .env | grep -v '^#' | xargs)
 fi
 
-# Ensure GITHUB_TOKEN is set
+# Ensure GITHUB_TOKEN is set, i had the problem that it expired make sure to keep track of this
 if [ -z "$GITHUB_TOKEN" ]; then
     echo "Error: GITHUB_TOKEN not set. Please set it in .env file or export it."
     exit 1
@@ -17,7 +17,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR" || exit 1
 
 # Run codeatlas with review PR creation
-# Example: ./run_with_review.sh https://github.com/user/repo your-github-handle
 REPO_URL="${1:-https://github.com/Luke943/Euler-Maths}"
 FORK_OWNER="${2:-ArtNooijen}"
 
